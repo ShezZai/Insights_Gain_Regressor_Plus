@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "insights-gain-regressor-plus"
+version = "0.1.0"
+description = "Stock-news article ingestion and scraping (ported from ticker-news-analyzer)."
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4",
+    "httpx>=0.27",
+    "trafilatura>=1.12",
+    "playwright>=1.40",
+    "psycopg[binary]>=3.2",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.6",
+    "python-dotenv",
+    "requests",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+# Only scripts/enrichment/distill_insights_to_db.py needs these.
+enrich = [
+    "pgvector>=0.4",
+    "google-genai>=2.8",
+    "openai>=2.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"ticker_news.scraping.store" = ["*.sql"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "db: tests that require a running Postgres",
+    "integration: tests that hit the live network",
+]
