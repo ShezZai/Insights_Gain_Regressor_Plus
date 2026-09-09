@@ -16,6 +16,14 @@ Three columns, all computed from 1-minute bars (Massive aggs API):
                                    09:30 ET regular-session open, as a fraction.
   gain_90m_after_article           primary_ticker: price 90 minutes after the
                                    article vs price at article time, as a fraction.
+  intraday_gain_till_article_first the same two, measured on
+  gain_90m_after_article_first     first_mentioned_ticker instead -- the name the
+                                   article actually talks about first, rather
+                                   than whichever ticker the feed listed first.
+                                   Pick with --ticker-column first, or
+                                   first_or_listed to fall back to
+                                   first_listed_ticker where the text names no
+                                   universe ticker.
 
 Note the SQL-legal name `gain_90m_after_article` -- an identifier cannot start
 with a digit, so `90_mins_gain_after_article` would need quoting everywhere.
@@ -73,10 +81,12 @@ MAX_RETRIES = 5
 
 DDL = """
 ALTER TABLE public.articles
-    ADD COLUMN IF NOT EXISTS vix_at_article_time               double precision,
+    ADD COLUMN IF NOT EXISTS vix_at_article_time                   double precision,
     ADD COLUMN IF NOT EXISTS aiq_ai_etf_intraday_gain_till_article double precision,
-    ADD COLUMN IF NOT EXISTS intraday_gain_till_article        double precision,
-    ADD COLUMN IF NOT EXISTS gain_90m_after_article            double precision
+    ADD COLUMN IF NOT EXISTS intraday_gain_till_article            double precision,
+    ADD COLUMN IF NOT EXISTS gain_90m_after_article                double precision,
+    ADD COLUMN IF NOT EXISTS intraday_gain_till_article_first      double precision,
+    ADD COLUMN IF NOT EXISTS gain_90m_after_article_first          double precision
 """
 
 
@@ -155,21 +165,38 @@ def fetch_month(ticker: str, ym: str, key: str, limiter: RateLimiter) -> dict[da
 
 PHASE_COLUMNS = {
     "index": ("vix_at_article_time", "aiq_ai_etf_intraday_gain_till_article"),
-    "ticker": ("intraday_gain_till_article", "gain_90m_after_article"),
+}
+# --ticker-column: which ticker the gains are measured on, and where they land.
+TICKER_COLUMNS = {
+    "primary": ("primary_ticker",
+                ("intraday_gain_till_article", "gain_90m_after_article")),
+    "first": ("first_mentioned_ticker",
+              ("intraday_gain_till_article_first", "gain_90m_after_article_first")),
+    # Same target columns, but falls back to the feed's first universe tag for
+    # articles that name no universe ticker in their text (or aren't scraped).
+    "first_or_listed": ("COALESCE(first_mentioned_ticker, first_listed_ticker)",
+                        ("intraday_gain_till_article_first", "gain_90m_after_article_first")),
 }
 SERIES_TICKER = {"vix": VIX_PROXY, "ai_etf": AI_ETF}
 
 
-def load_articles(conn, columns, ids, limit, reprocess):
-    """Articles still missing any of `columns` (all of them with --reprocess)."""
-    where = ["published_utc IS NOT NULL", "primary_ticker IS NOT NULL"]
+def load_articles(conn, columns, ids, limit, reprocess, ticker_column=None):
+    """Articles still missing any of `columns` (all of them with --reprocess).
+
+    `ticker_column` is the column the bars come from; the index phase passes
+    None because VIXY/AIQ are the same for every article, ticker or not.
+    """
+    where = ["published_utc IS NOT NULL"]
+    if ticker_column:
+        where.append(f"{ticker_column} IS NOT NULL")
     params: list = []
     if ids:
         where.append("id = ANY(%s)")
         params.append(ids)
     elif not reprocess:
         where.append("(" + " OR ".join(f"{c} IS NULL" for c in columns) + ")")
-    sql = (f"SELECT id, primary_ticker, published_utc FROM public.articles "
+    selected = ticker_column or "NULL::text"
+    sql = (f"SELECT id, {selected}, published_utc FROM public.articles "
            f"WHERE {' AND '.join(where)} ORDER BY published_utc")
     if limit:
         sql += f" LIMIT {int(limit)}"
@@ -232,8 +259,8 @@ def index_phase(conn, articles, series: Sequence[str], key, limiter, stats) -> N
     print(f"[index] wrote {len(rows)} row(s) :: {stats}", flush=True)
 
 
-def ticker_phase(conn, articles, key, limiter, rpm, stats) -> None:
-    """Fill the primary_ticker gain columns -- one call per (ticker, month)."""
+def ticker_phase(conn, articles, columns, key, limiter, rpm, stats) -> None:
+    """Fill a pair of gain columns -- one call per (ticker, month)."""
     by_month: dict[tuple[str, str], list[tuple[int, datetime]]] = defaultdict(list)
     for article_id, ticker, published in articles:
         et = published.astimezone(ET)
@@ -241,7 +268,6 @@ def ticker_phase(conn, articles, key, limiter, rpm, stats) -> None:
     print(f"[ticker] {len(by_month)} ticker-month call(s)"
           f" ~= {len(by_month) / rpm / 60:.1f}h at {rpm}/min", flush=True)
 
-    columns = PHASE_COLUMNS["ticker"]
     started = time.monotonic()
     for done, (ticker, ym) in enumerate(sorted(by_month), start=1):
         try:
@@ -282,7 +308,9 @@ def main() -> None:
     ap.add_argument("--reprocess", action="store_true", help="Recompute rows that already have values")
     ap.add_argument("--rpm", type=float, default=4.8, help="Request budget per minute (key allows ~5)")
     ap.add_argument("--phase", choices=["index", "ticker", "both"], default="both",
-                    help="index = VIXY/AI-ETF columns; ticker = primary_ticker gains")
+                    help="index = VIXY/AI-ETF columns; ticker = the per-name gains")
+    ap.add_argument("--ticker-column", choices=sorted(TICKER_COLUMNS), default="primary",
+                    help="ticker phase: measure gains on primary_ticker or first_mentioned_ticker")
     ap.add_argument("--series", default="vix,ai_etf",
                     help=f"index phase only: which of {sorted(SERIES_TICKER)} to fetch")
     args = ap.parse_args()
@@ -310,10 +338,12 @@ def main() -> None:
                 index_phase(conn, articles, series, key, limiter, stats)
 
         if args.phase in ("ticker", "both"):
-            articles = load_articles(conn, PHASE_COLUMNS["ticker"], ids, args.limit, args.reprocess)
-            print(f"[ticker] {len(articles)} article(s) to enrich", flush=True)
+            ticker_column, columns = TICKER_COLUMNS[args.ticker_column]
+            articles = load_articles(conn, columns, ids, args.limit, args.reprocess,
+                                     ticker_column=ticker_column)
+            print(f"[ticker] {len(articles)} article(s) on {ticker_column}", flush=True)
             if articles:
-                ticker_phase(conn, articles, key, limiter, args.rpm, stats)
+                ticker_phase(conn, articles, columns, key, limiter, args.rpm, stats)
 
     print(f"[done] {stats}", flush=True)
 

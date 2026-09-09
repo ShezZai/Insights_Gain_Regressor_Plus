@@ -24,11 +24,13 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
 ]
-# Only scripts/enrichment/distill_insights_to_db.py needs these.
+# Needed only by scripts/enrichment/: distill_insights_to_db.py (pgvector,
+# google-genai, openai) and flag_long_insights.py (tiktoken).
 enrich = [
     "pgvector>=0.4",
     "google-genai>=2.8",
     "openai>=2.0",
+    "tiktoken",
 ]
 
 [tool.setuptools.packages.find]

@@ -21,3 +21,4 @@ requests
 # pgvector>=0.4
 # google-genai>=2.8
 # openai>=2.0
+# tiktoken
