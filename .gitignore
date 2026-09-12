@@ -17,3 +17,5 @@ scraped_dump/
 *.log
 *.csv
 *.dump
+
+**/.DS_Store
