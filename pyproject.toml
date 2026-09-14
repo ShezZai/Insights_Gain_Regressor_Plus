@@ -60,10 +60,11 @@ model = [
 # root next to its spec and run configs rather than under src/. `include` keeps
 # scripts/ and tests/ from being picked up as packages by the "." root.
 where = ["src", "."]
-include = ["ticker_news*", "model_shay*"]
+include = ["ticker_news*", "model_shay*", "model_tree*"]
 
 [project.scripts]
 model-shay = "model_shay.cli:main"
+model-tree = "model_tree.cli:main"
 
 [tool.setuptools.package-data]
 "ticker_news.scraping.store" = ["*.sql"]

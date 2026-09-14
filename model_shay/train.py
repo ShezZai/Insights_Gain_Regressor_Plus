@@ -28,6 +28,8 @@ from model_shay import model as M
 from model_shay.config import Config
 from model_shay.data import (FLOAT_COLUMNS, FloatScaler, TargetTransform, build_dataset,
                              get_tokenizer, length_report, load_frame, split_frames)
+from model_shay.metrics import (HIGHER_BETTER, classification_metrics, compute_metrics,
+                                regression_metrics)
 
 
 def set_seed(seed: int) -> None:
@@ -54,35 +56,7 @@ def pick_precision(cfg: Config, device: torch.device) -> tuple[torch.dtype | Non
     return torch.float16, True
 
 
-def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
-    """MSE/MAE/RMSE/R2 in return units, plus MAE in bps for readability."""
-    err = np.asarray(y_pred, dtype=np.float64) - np.asarray(y_true, dtype=np.float64)
-    mse, mae = float(np.mean(err ** 2)), float(np.mean(np.abs(err)))
-    var = float(np.var(y_true))
-    return {"mse": mse, "rmse": math.sqrt(mse), "mae": mae,
-            "mae_bps": mae * 1e4, "r2": (1.0 - mse / var) if var > 0 else float("nan")}
-
-
 # --------------------------------------------------------------------------- #
-# Metrics where BIGGER is better, so the tracker compares their negation.
-HIGHER_BETTER = {"val_acc", "val_f1"}
-
-
-def classification_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
-    """Accuracy, macro-F1, and the ordinal-friendly within-one-class rate."""
-    from sklearn.metrics import f1_score
-
-    y_true, y_pred = np.asarray(y_true), np.asarray(y_pred)
-    return {"acc": float((y_true == y_pred).mean()),
-            "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
-            "within_1": float((np.abs(y_true - y_pred) <= 1).mean())}
-
-
-def compute_metrics(cfg: Config, y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
-    return (classification_metrics(y_true, y_pred) if cfg.task == "classification"
-            else regression_metrics(y_true, y_pred))
-
-
 class BestTracker:
     """Early stopping (§6): lowest `monitor` wins, best weights kept in RAM."""
 
