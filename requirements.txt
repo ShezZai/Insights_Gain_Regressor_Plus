@@ -22,3 +22,7 @@ requests
 # google-genai>=2.8
 # openai>=2.0
 # tiktoken
+#
+# Extended gain features (also the [enrich] extra), for
+# scripts/enrichment/add_extended_gain_features.py:
+# yfinance>=0.2
