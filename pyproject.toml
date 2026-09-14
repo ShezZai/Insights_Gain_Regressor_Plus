@@ -32,12 +32,44 @@ enrich = [
     "openai>=2.0",
     "tiktoken",
 ]
+# Needed only by model_shay/: the text + market-floats regression model
+# (see model_shay_spec.md). Text comes from articles.consolidated_insights and
+# is padded to a flat 512 tokens, so the 81 rows flagged
+# insights_too_long_more_than_500 are excluded rather than truncated.
+# The local GPU is an RTX 5060 Ti (Blackwell, sm_120), which needs CUDA 12.8
+# kernels — the default PyPI wheel is built against an older arch list and
+# fails at runtime with "no kernel image is available for execution". Hence
+# torch>=2.7 and the cu128 index:
+#   pip install -e ".[model]" --extra-index-url https://download.pytorch.org/whl/cu128
+model = [
+    "torch>=2.7",
+    "transformers>=4.44",
+    "accelerate>=0.34",     # HF Trainer backend, bf16/fp16 mixed precision
+    "peft>=0.13",           # LoRA adapters (train_mode="lora")
+    "sentencepiece>=0.2",   # deberta-v3 tokenizer is SentencePiece-based
+    "protobuf>=4.25",       # slow -> fast tokenizer conversion
+    "scikit-learn>=1.5",    # GroupKFold, StandardScaler, the §7 baselines
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "pyarrow>=17",          # parquet input
+    "pyyaml>=6.0",          # the run config file
+]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+# Two roots: the src-layout package plus model_shay/, which sits at the repo
+# root next to its spec and run configs rather than under src/. `include` keeps
+# scripts/ and tests/ from being picked up as packages by the "." root.
+where = ["src", "."]
+include = ["ticker_news*", "model_shay*"]
+
+[project.scripts]
+model-shay = "model_shay.cli:main"
 
 [tool.setuptools.package-data]
 "ticker_news.scraping.store" = ["*.sql"]
+# configs/ holds data, not code, so it is attached to the parent package
+# rather than being made a package of its own.
+"model_shay" = ["configs/*.yaml"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

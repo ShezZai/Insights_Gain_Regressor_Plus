@@ -23,8 +23,12 @@ source "$VENV_DIR/bin/activate"
 echo "Upgrading pip..."
 pip install --upgrade pip
 
-echo "Installing package (editable, with dev and enrich extras)..."
-pip install -e ".[dev,enrich]"
+echo "Installing package (editable, with dev, enrich and model extras)..."
+# The model extra pulls torch (~2.5GB). The RTX 5060 Ti is sm_120, so if the
+# default PyPI wheel lands without Blackwell kernels, re-run against cu128:
+#   pip install -e ".[model]" --force-reinstall \
+#       --extra-index-url https://download.pytorch.org/whl/cu128
+pip install -e ".[dev,enrich,model]"
 
 echo ""
 echo "Done. To activate the venv run:"

@@ -37,6 +37,7 @@ from collections import Counter
 import psycopg
 
 from ticker_news.enrichment.tagging import build_matcher, load_ticker_data
+from ticker_news.shared.db import resolve_dsn
 
 DDL = "ALTER TABLE public.articles ADD COLUMN IF NOT EXISTS first_mentioned_ticker text"
 
@@ -58,13 +59,14 @@ def build_class_map(data: dict) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--dsn", default="dbname=news_trading_window")
+    ap.add_argument("--dsn", default=None,
+                    help="Postgres DSN (default: DATABASE_URL / NEWS_DB_DSN from .env)")
     ap.add_argument("--reprocess", action="store_true",
                     help="Recompute rows that already have a value")
     ap.add_argument("--dry-run", action="store_true", help="Report only, write nothing")
     args = ap.parse_args()
 
-    with psycopg.connect(args.dsn, autocommit=True) as conn:
+    with psycopg.connect(resolve_dsn(args.dsn), autocommit=True) as conn:
         conn.execute(DDL)
         data = load_ticker_data(conn)
         find = build_matcher(data)

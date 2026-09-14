@@ -29,7 +29,7 @@ Usage:
     python distill_insights_to_db.py --no-embed         # skip OpenAI embeddings
 
 Requires GOOGLE_API_KEY (Gemini) and OPENAI_API_KEY (embeddings, unless
---no-embed). Connection from NEWS_DB_DSN / DATABASE_URL.
+--no-embed). Connection from DATABASE_URL, else NEWS_DB_DSN (shared resolver).
 """
 
 from __future__ import annotations
@@ -47,9 +47,11 @@ import psycopg
 from dotenv import load_dotenv
 from pgvector.psycopg import register_vector
 
+from ticker_news.shared.db import resolve_dsn
+
 load_dotenv()
 
-DB_DSN = os.getenv("NEWS_DB_DSN") or os.getenv("DATABASE_URL") or "dbname=news"
+DB_DSN = resolve_dsn()   # DATABASE_URL, else NEWS_DB_DSN / SCRAPER_DB_DSN
 
 EXTRACT_MODEL = "gemini-2.5-flash-lite"   # pass 1
 GATE_MODEL = "gemini-2.5-flash-lite"      # pass 2 (per-box gate)

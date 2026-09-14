@@ -1,23 +1,49 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _env_files() -> tuple[str, ...]:
+    """The .env files to read, lowest priority first.
+
+    A bare env_file=".env" resolves against the CURRENT WORKING DIRECTORY, so
+    the same script picked up the real database from the repo root and silently
+    fell back to the built-in default when run from scripts/enrichment/ -- a
+    password-auth failure against a `scraper` user nobody configured. Anchoring
+    to the directory holding pyproject.toml makes the database independent of
+    where the command was typed. A .env in the working directory is still read
+    afterwards, so a per-directory override keeps working.
+    """
+    files: list[Path] = []
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "pyproject.toml").is_file():
+            if (parent / ".env").is_file():
+                files.append(parent / ".env")
+            break
+    cwd_env = Path.cwd() / ".env"
+    if cwd_env.is_file() and cwd_env not in files:
+        files.append(cwd_env)
+    return tuple(str(f) for f in files)
+
+
 class AppSettings(BaseSettings):
     """Single source of configuration for the whole package.
 
-    One database (DATABASE_URL) for every stage — the scraper's old
-    SCRAPER_DB_DSN and the analysis scripts' NEWS_DB_DSN both die here.
+    One database for every stage. DATABASE_URL is the canonical name; the
+    analysis scripts' NEWS_DB_DSN and the scraper's SCRAPER_DB_DSN are honoured
+    as fallbacks, in that order, so an .env carrying either still works.
     """
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_env_files(), extra="ignore")
 
     database_url: str = Field(
         default="postgresql://scraper:scraper@localhost:5432/news",
-        # SCRAPER_DB_DSN is honored as a fallback for the migration window
-        # (legacy scraper convention); remove the alias in the final cleanup phase.
-        validation_alias=AliasChoices("DATABASE_URL", "SCRAPER_DB_DSN"),
+        # First match wins: DATABASE_URL is canonical, the other two are the
+        # legacy scraper and analysis-script names kept alive for existing .env
+        # files. Scripts reach this through shared.db.resolve_dsn().
+        validation_alias=AliasChoices("DATABASE_URL", "NEWS_DB_DSN", "SCRAPER_DB_DSN"),
     )
 
     massive_api_key: str | None = Field(default=None, validation_alias="MASSIVE_API_KEY")

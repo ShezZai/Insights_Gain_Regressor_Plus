@@ -1,0 +1,88 @@
+# Default run config for model_shay -- every key mirrors model_shay_spec.md §9.
+# Override any of these on the command line; an unset flag never clobbers a
+# value set here.
+#
+# NOTE ON NUMBER FORMAT: PyYAML follows YAML 1.1, where a float needs both a
+# decimal point and a signed exponent. Write 1.0e-3, never 1e-3 -- the latter
+# parses as the *string* "1e-3". Config loading coerces by dataclass field type
+# so a slip is caught rather than silently training at lr="1e-3".
+
+# ---- data (§1) -------------------------------------------------------------
+dsn: null                     # null -> ticker_news.shared.db.connect (DATABASE_URL)
+input_path: null              # or a .csv/.parquet export of the same columns
+text_column: "consolidated_insights"
+ticker_variant: "primary"     # "primary" | "first" -- picks the float_2/target pair
+# "gain_90m_after"     the forward return (the real task)
+# "intraday_gain_till" the move already realized at article time -- a positive
+#                      control the text should be able to describe. In the
+#                      30m_before window this is the -30m -> article segment,
+#                      which does not overlap float_2 (open -> -30m).
+target_kind: "gain_90m_after"
+# "at_article" = features and target measured at the article's minute.
+# "30m_before" = measured 30 minutes earlier; target spans -30m..+90m, so it
+#                also contains the pre-publication drift. First-ticker only.
+window: "at_article"          # --30m is shorthand for "30m_before"
+exclude_first_market_30m: true   # 30m window: drop the 449 first-half-hour articles
+# articles.is_act_from_insights: null = no filter, true = actionable rows only,
+# false = the rest. Applies to training, validation AND test alike (--act).
+act_filter: null
+use_floats: true              # false = text-only model
+# Feed articles.sentiment (1..5) as a 5-dim one-hot appended to the dense input
+# vector (--sentiment). Not standardized. Rows with NULL sentiment are dropped.
+use_sentiment: false
+# Feed articles.is_act_from_insights as a 2-dim one-hot input (--act).
+use_act: false
+exclude_long_insights: true   # drop the 81 insights_too_long_more_than_500 rows
+padding: "max_length"         # flat 512-token batches; NOT dynamic padding
+max_length: 512
+group_by: ["ticker", "et_date"]   # GroupKFold key (§5)
+log_transform_floats: false   # signed log1p on the 3 floats
+target_transform: "standardize"   # "standardize" | "percent" | "none"
+limit: null
+
+# ---- model (§2) ------------------------------------------------------------
+encoder_name: "microsoft/deberta-v3-base"
+pooling: "mean"               # "cls" | "mean"
+head_hidden_dim: 128
+head_dropout: 0.25
+
+# ---- loss (§3) -------------------------------------------------------------
+loss_type: "huber"            # "mse" | "huber"
+huber_delta: 1.0
+
+# ---- training (§4) ---------------------------------------------------------
+train_mode: "partial_freeze"  # "partial_freeze" | "lora"
+freeze_except_last_n: 3
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.1
+lora_target_modules: null     # null -> autodetect query/value projections
+head_lr: 1.0e-3
+encoder_lr: 2.0e-5
+phase2_min_lr: 5.0e-6         # discriminative-LR floor for the earliest layer
+phase1_epochs: 4
+unfreeze_all_phase2: true
+weight_decay: 0.01
+warmup_ratio: 0.06
+max_grad_norm: 1.0
+batch_size: 16
+grad_accum: 1
+# ON by default because phase 2 does not fit on the 16GB target without it.
+# Measured peak allocation in phase 2 (full unfreeze, seq 512, bf16), against
+# ~13.1 GiB usable once the display takes its ~2.4 GiB:
+#     batch 16, off -> 12.6 GiB (fits only with nothing else on the card)
+#     batch 32, off -> OOM
+#     batch 16/32/64, on -> 3.6 / 5.0 / 7.8 GiB at 20.2 / 20.5 / 23.7 samples/s
+# The recompute is nearly free here, so this buys headroom AND a larger batch.
+gradient_checkpointing: true
+max_epochs: 20
+precision: "auto"             # "auto" | "bf16" | "fp16" | "fp32"
+seed: 42
+
+# ---- early stopping (§6) ---------------------------------------------------
+patience: 3
+monitor: "val_loss"           # "val_loss" | "val_mae" | "val_mse"
+
+# ---- k-fold (§5) -----------------------------------------------------------
+use_kfold: true
+k_folds: 5

@@ -25,11 +25,14 @@ import argparse
 
 import psycopg
 
+from ticker_news.shared.db import resolve_dsn
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--dsn", default="dbname=news_trading_window")
+    ap.add_argument("--dsn", default=None,
+                    help="Postgres DSN (default: DATABASE_URL / NEWS_DB_DSN from .env)")
     ap.add_argument("--threshold", type=int, default=350)
     ap.add_argument("--unit", choices=["tokens", "words"], default="words")
     ap.add_argument("--column", default="more_than_350_insights",
@@ -46,7 +49,7 @@ def main() -> None:
     if not args.column.replace("_", "").isalnum():
         ap.error("--column must be a plain identifier")
 
-    with psycopg.connect(args.dsn, autocommit=True) as conn:
+    with psycopg.connect(resolve_dsn(args.dsn), autocommit=True) as conn:
         conn.execute(f"ALTER TABLE public.articles "
                      f"ADD COLUMN IF NOT EXISTS {args.column} boolean")
         with conn.cursor() as cur:

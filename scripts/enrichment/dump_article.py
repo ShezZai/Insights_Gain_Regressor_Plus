@@ -18,11 +18,12 @@ Usage:
     python dump_article.py 8721
     python dump_article.py 8721 9491 --out /tmp/dumps
     python dump_article.py 8721 --source distilled
-    python dump_article.py 8721 --dsn "postgresql://shay:pw@localhost:15432/sharedproject"
+    python dump_article.py 8721 --dsn "postgresql://shay@/other?host=/var/run/postgresql"
 
-Defaults to the LOCAL `news` DB on :5432 (peer auth over the unix socket, i.e.
-`dbname=news`). .env's NEWS_DB_DSN (sharedproject) is deliberately ignored —
-pass --dsn if you want that one instead.
+Defaults to the .env database (DATABASE_URL, else NEWS_DB_DSN) like every other
+script here. It used to hardcode `dbname=news` and ignore NEWS_DB_DSN, from when
+that name pointed at a different database; it now points at the same corpus, so
+the carve-out is gone. Pass --dsn to reach anything else.
 """
 
 from __future__ import annotations
@@ -34,8 +35,7 @@ from pathlib import Path
 
 import psycopg
 
-# Local `news` DB on port 5432 via the unix socket (peer auth) — NOT sharedproject.
-DEFAULT_DSN = "dbname=news"
+from ticker_news.shared.db import resolve_dsn
 
 ARTICLE_COLS = [
     "id", "url", "source_domain", "publisher", "published_utc", "title", "author",
@@ -141,14 +141,14 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("ids", nargs="+", type=int, help="article id(s) to dump")
     ap.add_argument("--out", default="article_dumps", help="output root dir")
-    ap.add_argument("--dsn", default=DEFAULT_DSN,
-                    help=f"Postgres DSN (default: local news DB, {DEFAULT_DSN!r})")
+    ap.add_argument("--dsn", default=None,
+                    help="Postgres DSN (default: DATABASE_URL / NEWS_DB_DSN from .env)")
     ap.add_argument("--source", choices=["article", "distilled", "both"], default="both",
                     help="which insight table(s) to dump (default: both)")
     args = ap.parse_args()
 
     out_root = Path(args.out)
-    with psycopg.connect(args.dsn) as conn:
+    with psycopg.connect(resolve_dsn(args.dsn)) as conn:
         for article_id in args.ids:
             dump(conn, article_id, out_root, args.source)
 

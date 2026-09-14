@@ -3,6 +3,16 @@ import psycopg
 from ticker_news.shared.config import get_settings
 
 
+def resolve_dsn(explicit: str | None = None) -> str:
+    """The DSN a script should use: an explicit --dsn, else the one from .env.
+
+    Env precedence is AppSettings': DATABASE_URL first, then the legacy
+    NEWS_DB_DSN and SCRAPER_DB_DSN aliases. Scripts take --dsn=None by default
+    so the .env is the single place the database is named.
+    """
+    return explicit or get_settings().database_url
+
+
 def connect(*, vector: bool = False, autocommit: bool = False) -> psycopg.Connection:
     """One connection convention for every stage (single DATABASE_URL).
 

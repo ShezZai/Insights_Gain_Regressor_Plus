@@ -22,3 +22,19 @@ requests
 # google-genai>=2.8
 # openai>=2.0
 # tiktoken
+
+# The regression model (the [model] extra), for model_shay/. Prefer
+# pip install -e ".[model]" so the CUDA wheel index can be pointed at the
+# local GPU (sm_120 needs cu128); see the comment above the extra in
+# pyproject.toml.
+# torch>=2.7
+# transformers>=4.44
+# accelerate>=0.34
+# peft>=0.13
+# sentencepiece>=0.2
+# protobuf>=4.25
+# scikit-learn>=1.5
+# pandas>=2.2
+# numpy>=1.26
+# pyarrow>=17
+# pyyaml>=6.0

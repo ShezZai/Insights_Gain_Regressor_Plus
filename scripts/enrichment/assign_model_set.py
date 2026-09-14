@@ -40,6 +40,8 @@ from zoneinfo import ZoneInfo
 
 import psycopg
 
+from ticker_news.shared.db import resolve_dsn
+
 ET = ZoneInfo("America/New_York")
 TRAIN, VAL, TEST = "training", "validation", "test"
 
@@ -69,7 +71,8 @@ def mark_test_unseen(conn) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--dsn", default="dbname=news_trading_window")
+    ap.add_argument("--dsn", default=None,
+                    help="Postgres DSN (default: DATABASE_URL / NEWS_DB_DSN from .env)")
     ap.add_argument("--test-share", type=float, default=0.20)
     ap.add_argument("--val-share", type=float, default=0.20)
     ap.add_argument("--holdout-share", type=float, default=0.16,
@@ -84,7 +87,7 @@ def main() -> None:
 
     rng = random.Random(args.seed)
 
-    with psycopg.connect(args.dsn, autocommit=True) as conn:
+    with psycopg.connect(resolve_dsn(args.dsn), autocommit=True) as conn:
         conn.execute(DDL)
         ticker_expr = ("primary_ticker" if args.ticker_column == "primary"
                        else args.ticker_column)

@@ -36,6 +36,7 @@ import requests
 from ticker_news.ingestion.massive_rest import BASE_URL, PAGE_LIMIT
 from ticker_news.scraping.urls import canonicalize_url, domain_of
 from ticker_news.shared.config import get_settings
+from ticker_news.shared.db import resolve_dsn
 
 ET = ZoneInfo("America/New_York")
 REGULAR_OPEN = dtime(9, 30)
@@ -130,7 +131,8 @@ def fetch(ticker: str, start: str, end: str, key: str, limiter: RateLimiter) -> 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--dsn", default="dbname=news_trading_window")
+    ap.add_argument("--dsn", default=None,
+                    help="Postgres DSN (default: DATABASE_URL / NEWS_DB_DSN from .env)")
     ap.add_argument("--tickers", default=None, help="Comma-separated; default = every primary_ticker in the table")
     ap.add_argument("--range", dest="ranges", action="append", default=None,
                     help="START:END (repeatable). Default: the two gap ranges around the corpus.")
@@ -144,7 +146,7 @@ def main() -> None:
     key = get_settings().massive_api_key
     limiter = RateLimiter(args.rpm)
 
-    with psycopg.connect(args.dsn, autocommit=True) as conn:
+    with psycopg.connect(resolve_dsn(args.dsn), autocommit=True) as conn:
         if args.tickers:
             tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
         else:

@@ -17,3 +17,10 @@ scraped_dump/
 *.log
 *.csv
 *.dump
+
+# Training artifacts (model_shay). A run directory holds one ~350MB checkpoint
+# per fold plus its metrics; the CLI creates it relative to wherever it was
+# invoked, so this is deliberately unanchored and matches runs/ at any depth.
+runs/
+*.pt
+*.pth

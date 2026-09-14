@@ -68,6 +68,7 @@ import psycopg
 import requests
 
 from ticker_news.research.market_data import AGGS_URL, api_key
+from ticker_news.shared.db import resolve_dsn
 
 ET = ZoneInfo("America/New_York")
 REGULAR_OPEN = dtime(9, 30)
@@ -302,7 +303,8 @@ def ticker_phase(conn, articles, columns, key, limiter, rpm, stats) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--dsn", default="dbname=news_trading_window", help="Postgres DSN")
+    ap.add_argument("--dsn", default=None,
+                    help="Postgres DSN (default: DATABASE_URL / NEWS_DB_DSN from .env)")
     ap.add_argument("--limit", type=int, default=None, help="Only the first N articles")
     ap.add_argument("--ids", default=None, help="Comma-separated article ids")
     ap.add_argument("--reprocess", action="store_true", help="Recompute rows that already have values")
@@ -326,7 +328,7 @@ def main() -> None:
     stats = {"vix": 0, "ai_etf": 0, "gain_till": 0, "gain_after": 0,
              "no_bars": 0, "errors": 0}
 
-    with psycopg.connect(args.dsn, autocommit=True) as conn:
+    with psycopg.connect(resolve_dsn(args.dsn), autocommit=True) as conn:
         conn.execute(DDL)
 
         if args.phase in ("index", "both"):
