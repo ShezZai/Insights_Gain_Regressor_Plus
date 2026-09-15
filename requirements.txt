@@ -22,7 +22,6 @@ requests
 # google-genai>=2.8
 # openai>=2.0
 # tiktoken
-
 # The regression model (the [model] extra), for model_shay/. Prefer
 # pip install -e ".[model]" so the CUDA wheel index can be pointed at the
 # local GPU (sm_120 needs cu128); see the comment above the extra in
@@ -38,3 +37,7 @@ requests
 # numpy>=1.26
 # pyarrow>=17
 # pyyaml>=6.0
+#
+# Extended gain features (also the [enrich] extra), for
+# scripts/enrichment/add_extended_gain_features.py:
+# yfinance>=0.2

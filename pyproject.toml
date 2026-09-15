@@ -25,12 +25,14 @@ dev = [
     "pytest-asyncio>=0.24",
 ]
 # Needed only by scripts/enrichment/: distill_insights_to_db.py (pgvector,
-# google-genai, openai) and flag_long_insights.py (tiktoken).
+# google-genai, openai), flag_long_insights.py (tiktoken), and
+# add_extended_gain_features.py (yfinance).
 enrich = [
     "pgvector>=0.4",
     "google-genai>=2.8",
     "openai>=2.0",
     "tiktoken",
+    "yfinance>=0.2",
 ]
 # Needed only by model_shay/: the text + market-floats regression model
 # (see model_shay_spec.md). Text comes from articles.consolidated_insights and

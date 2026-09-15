@@ -26,3 +26,7 @@ scraped_dump/
 runs/
 *.pt
 *.pth
+
+# transient artifacts: gdown partial downloads, editor lock files
+*.part
+.~lock.*#
