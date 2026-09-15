@@ -22,12 +22,12 @@ and 90 minutes before the close. **5,506** carry LLM-distilled insight text
 Split 60/20/20 by `model_set`, ticker-balanced, with the most recent trading days
 reserved wholesale as a temporal holdout:
 
-![Article dates by split](presentation_assets/02-article-dates-by-split.png)
+![Article dates by split](presentations/assets/02-article-dates-by-split.png)
 
 The test split is deliberately concentrated in the newest months — a model cannot
 learn a day and replay it. Targets are tight and near-symmetric around zero:
 
-![90-minute gain distribution](presentation_assets/04-target-90m-gain-distribution.png)
+![90-minute gain distribution](presentations/assets/04-target-90m-gain-distribution.png)
 
 | target | sd | comment |
 |---|---|---|
@@ -38,11 +38,11 @@ learn a day and replay it. Targets are tight and near-symmetric around zero:
 The same shape holds for the intraday move up to the article — a tight,
 near-symmetric distribution centred on zero, in every split:
 
-![Intraday gain distribution](presentation_assets/03-intraday-gain-distribution.png)
+![Intraday gain distribution](presentations/assets/03-intraday-gain-distribution.png)
 
 The distilled sentiment labels skew positive:
 
-![Sentiment distribution](presentation_assets/01-sentiment-distribution.png)
+![Sentiment distribution](presentations/assets/01-sentiment-distribution.png)
 
 ---
 
@@ -96,7 +96,7 @@ Methodology that makes the nulls trustworthy:
 
 ## 4. Results
 
-![All model families by R²](presentation_assets/14-consolidated-r2-all-families.png)
+![All model families by R²](presentations/assets/14-consolidated-r2-all-families.png)
 
 Scored on the same held-out split (n=1,236, sd 109 bps):
 
@@ -137,11 +137,11 @@ R² measures magnitude. For trading, the question is simpler: does it get the
 | 2b | Combined Encoder-NN | **49.43%** | 50.57% | 610 / 1,236 |
 | 2c | JSON-LLM, LoRA | **52.19%** | 47.81% | 84 / 1,236 |
 
-![Fusion Network prediction analysis](presentation_assets/11-eval-fusion-network.png)
+![Fusion Network prediction analysis](presentations/assets/11-eval-fusion-network.png)
 
-![Combined Encoder-NN prediction analysis](presentation_assets/12-eval-combined-encoder-nn.png)
+![Combined Encoder-NN prediction analysis](presentations/assets/12-eval-combined-encoder-nn.png)
 
-![LoRA LLM prediction analysis](presentation_assets/13-eval-lora-llm.png)
+![LoRA LLM prediction analysis](presentations/assets/13-eval-lora-llm.png)
 
 Two of the three are **below a coin flip**. The third, at 52.19%, is 1.5 standard
 errors from chance (SE = 1.42 pp on n = 1,236) — the kind of number that appears and
@@ -155,11 +155,11 @@ No family achieves directional skill worth acting on.
 
 The three notebook families converge cleanly — this is not a failure to optimise:
 
-![Fusion Network training](presentation_assets/06-fusion-network-training.png)
+![Fusion Network training](presentations/assets/06-fusion-network-training.png)
 
-![Combined Encoder-NN training](presentation_assets/07-combined-training.png)
+![Combined Encoder-NN training](presentations/assets/07-combined-training.png)
 
-![LoRA LLM training](presentation_assets/08-lora-training.png)
+![LoRA LLM training](presentations/assets/08-lora-training.png)
 
 Validation error flattens early and stays flat while training error keeps falling.
 The models are learning the training set, not the relationship.
@@ -179,7 +179,7 @@ roughly a constant no matter how much of it is trainable.
 
 ### What the tree leans on
 
-![Tree permutation importance](presentation_assets/09-tree-permutation-importance.png)
+![Tree permutation importance](presentations/assets/09-tree-permutation-importance.png)
 
 Because R² is negative, this chart is **reliance, not usefulness** — the features the
 tree leans on are exactly why it loses to the mean. The two dominant ones are
@@ -191,7 +191,7 @@ held-out performance.
 
 ## 5. It is not a tuning failure
 
-![LR probe](presentation_assets/10-lr-probe.png)
+![LR probe](presentations/assets/10-lr-probe.png)
 
 Train loss falls freely (0.388 → 0.192) while validation *rises* (0.307 → 0.349). At
 5× the learning rate it memorises harder and generalises worse. The model is not
@@ -209,7 +209,7 @@ capacity-starved or under-trained — it is signal-starved.
 | corpus too noisy | restrict to actionable articles | **worse** — the full-population model beat the actionable-trained model *on the actionable rows themselves* (corr +0.127 vs +0.041) |
 | pipeline cannot read text | predict sentiment from text | encoder: train MSE 2.60 → 0.18, test MAE 0.388 on a 1–5 scale. TF-IDF classifier: 55.0% acc vs 42.7% majority. **It reads fine** |
 
-![Encoder training](presentation_assets/05-encoder-training.png)
+![Encoder training](presentations/assets/05-encoder-training.png)
 
 The encoder learns sentiment from text without difficulty. It is the mapping from
 text to *future return* that does not exist.
