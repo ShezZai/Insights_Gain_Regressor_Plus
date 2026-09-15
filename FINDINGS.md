@@ -7,7 +7,7 @@ forecasting the move *after* an article, and it holds for describing the move th
 *already happened* 30 minutes before it.
 
 > Everything below comes from two artifacts in this repo:
-> `train_news_model_extended_inlined.ipynb` (a single executed run, all figures) and
+> `train_news_model.ipynb` (a single executed run, all figures) and
 > the CLI experiments recorded in `tries.md`.
 
 ---
@@ -65,6 +65,39 @@ extremes, well inside sampling noise on 5,500 rows.
 
 This is a statement about the data, not about any model. Everything that follows is
 constrained by it.
+
+### Is 90 minutes even the right horizon?
+
+A second data-side check, asking whether the target itself is learnable before asking
+whether a model can learn it. Sentiment against the realised move, bucketed into
+Loss / Neutral / Gain at a ±0.5% threshold:
+
+![Sentiment vs. 90-minute move](presentations/assets/15-sentiment-vs-gain-heatmap.png)
+
+| sentiment | Loss | Neutral | Gain | neutral % | loss share of non-neutral |
+|---|---|---|---|---|---|
+| Strongly negative | 72 | 119 | 60 | 47.4% | 54.5% |
+| Negative | 141 | 265 | 160 | 46.8% | 46.8% |
+| Neutral | 241 | 554 | 221 | 54.5% | 52.2% |
+| Positive | 507 | 1,235 | 523 | 54.5% | 49.2% |
+| Strongly positive | 353 | 707 | 338 | 50.6% | 51.1% |
+| **total** | **1,314** | **2,880** | **1,302** | **52.4%** | **50.2%** |
+
+Two things fall out of it:
+
+1. **52.4% of articles are followed by a move smaller than ±0.5%.** More than half the
+   corpus is "nothing happened". Training a regressor against a target that is mostly
+   noise around zero is hard for a reason that has nothing to do with the model.
+2. **Of the articles that did move, the split is 50.2% down / 49.8% up** — and the
+   per-row loss share wanders between 46.8% and 54.5% with no ordering by sentiment.
+   The strongly-negative row is 54.5% losses; the merely-negative row is 46.8%.
+
+The natural follow-up — does a longer horizon help? — is built but not yet measured:
+`scripts/enrichment/add_extended_gain_features.py` adds `gain_24h_after_article` and
+`gain_7d_after_article` via yfinance. Those columns are not yet populated in this
+corpus, so the notebook plots the 90-minute panel alone and reports the other two as
+missing. Longer windows do contain more movement; whether the direction becomes
+predictable is open.
 
 ---
 
@@ -280,4 +313,4 @@ model-tree  train --30m --sentiment --act --kfold --eval-test --out-dir runs/tre
 
 Per-fold metrics, configs and length reports: `model_shay/runs/*/summary.json`,
 `model_tree/runs/*/`. Full write-up: `tries.md`. Executed notebook with all figures:
-`train_news_model_extended_inlined.ipynb`.
+`train_news_model.ipynb`.
